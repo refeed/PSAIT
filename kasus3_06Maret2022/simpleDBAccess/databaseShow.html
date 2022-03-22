@@ -1,0 +1,41 @@
+<html>
+    <head>
+        <title>
+            Show database in native Golang
+        </title>
+    </head>
+    <body>
+        <h1>Simple DB Access Golang Native</h1>
+        <p>Host db version: %v</p>
+        <p>Remote db version: %v</p>
+
+        <form action="/studentProxy?type=post" method="get">
+            <input type="text" name="Add student name" placeholder="name">
+            <input type="submit" value="Add">
+        </form>
+        <table>
+            <tr>
+                <th>
+                    ID
+                </th>
+                <th>
+                    Name
+                </th>
+                <th>
+                    Action
+                </th>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td>Test</td>
+                <td>
+                    <form action="/studentProxy" method="get">
+                        <input type="hidden" name="id" value="%v" />
+                        <input type="hidden" name="type" value="update" />
+                        <input type="text" name="Update name" placeholder="newName">
+                        <input type="submit" value="Update">
+                    </form>|<a href="/studentProxy?type=delete&id=%v">Delete</a></td>
+            </tr>
+        </table>
+    </body>
+</html>
