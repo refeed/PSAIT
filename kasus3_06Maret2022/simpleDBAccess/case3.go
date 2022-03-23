@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/tidwall/gjson"
 )
 
 func main() {
@@ -21,7 +22,8 @@ func main() {
 }
 
 const (
-	REMOTE_ADDRESS = "http://127.0.0.1:8080"
+	REMOTE_ADDRESS       = "http://192.168.56.2:8080"
+	OPEN_WEATHER_API_KEY = "cf71e15f43680c10f0b382a05e117ae8"
 )
 
 func studentProxyHandler(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +76,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	db.QueryRow("SELECT VERSION()").Scan(&localVersion)
 	getUbuntuMariaDBVersion(&remoteVersion)
 
-	renderHtml(w, localVersion, remoteVersion, getRemoteStudents())
+	renderHtml(w, localVersion, remoteVersion, getRemoteStudents(),
+		getYogyakartaWeather())
 }
 
 func getUbuntuMariaDBVersion(ret *string) {
@@ -120,7 +123,35 @@ func getRemoteStudents() []RemoteStudent {
 	return remoteStudents
 }
 
-func renderHtml(w io.Writer, hostSqlVer string, remoteSqlVer string, students []RemoteStudent) {
+type Weather struct {
+	PlaceName   string
+	Temperature float64
+}
+
+func getYogyakartaWeather() Weather {
+	apiUrl := fmt.Sprintf("https://api.openweathermap.org/data/2.5/weather?units=metric&lat=%v&lon=%v&appid=%v",
+		-7.797068, 110.370529, // Yogyakarta coordinate
+		OPEN_WEATHER_API_KEY)
+	resp, err := http.Get(apiUrl)
+
+	if err != nil {
+		log.Fatalln(err)
+		return Weather{"Error", 0.0}
+	}
+
+	bodyRaw, _ := ioutil.ReadAll(resp.Body)
+
+	var weather Weather
+	weather.PlaceName = gjson.Get(string(bodyRaw), "name").String()
+	weather.Temperature = gjson.Get(string(bodyRaw), "main.temp").Float()
+
+	return weather
+}
+
+func renderHtml(w io.Writer, hostSqlVer string, remoteSqlVer string,
+	students []RemoteStudent, weather Weather) {
+	// TODO: Use template/http instead of just printing to the buffer
+	// https://www.calhoun.io/intro-to-templates-p1-contextual-encoding/
 	fmt.Fprintf(w, `<html>
     <head>
         <title>
@@ -131,6 +162,7 @@ func renderHtml(w io.Writer, hostSqlVer string, remoteSqlVer string, students []
         <h1>Simple DB Access Golang Native</h1>
         <p>Host db version: %v</p>
         <p>Remote db version: %v</p>
+		<p>Temperature now at %v is %v celcius</p>
         <form action="/studentProxy" method="get">
 			<input type="hidden" name="type" value="post" />
             <input type="text" name="newName" placeholder="Add student name">
@@ -147,7 +179,7 @@ func renderHtml(w io.Writer, hostSqlVer string, remoteSqlVer string, students []
                 <th>
                     Action
                 </th>
-            </tr>`, hostSqlVer, remoteSqlVer)
+            </tr>`, hostSqlVer, remoteSqlVer, weather.PlaceName, weather.Temperature)
 
 	for _, student := range students {
 		fmt.Fprintf(w, `<tr>
